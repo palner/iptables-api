@@ -51,6 +51,27 @@ cat > /etc/logrotate.d/iptables-api << EOF
 EOF
 ```
 
+## Kamailio Example
+
+```bash
+loadmodule "http_client.so"
+loadmodule "htable.so"
+... 
+modparam("htable", "htable", "ipban=>size=8;autoexpire=600;")
+... 
+if (!pike_check_req()) {
+  xlog("L_ALERT","ALERT: pike blocking $rm from $fu (IP:$si:$sp)\n");
+  $sht(ipban=>$si) = 1;
+  http_client_query("http://localhost:8082/addip/$si", "$var(apinfo)");
+  exit;
+}
+... 
+event_route[htable:expired:ipban] {
+  xlog("mytable record expired $shtrecord(key) => $shtrecord(value)\n");
+  http_client_query("http://localhost:8082/removeip/$shtrecord(key)", "$var(apinfo)");
+}
+```
+
 ## License / Warranty
 
 iptables-api is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version
