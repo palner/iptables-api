@@ -2,7 +2,7 @@
 
 Very simple API for managing local iptables chain: `APIBANLOCAL`
 
-Simple `GET` actions of add, remove, and flush.
+Simple `GET` actions of add, remove, and flush (see [API usage](#API-usage) for more).
 
 ## Usage
 
@@ -13,6 +13,10 @@ Defaults:
 * port: `8082`
 * log: `/var/log/iptables-api.log`
 * target: `REJECT`
+
+Compiled `iptables-api` will work for most linux distributions and `iptables-api-arm` will work for most Raspberry Pi distributions.
+
+You can also compile the program using `go build iptables-api.go`.
 
 ### Example with flags
 
@@ -70,6 +74,117 @@ event_route[htable:expired:ipban] {
   xlog("mytable record expired $shtrecord(key) => $shtrecord(value)\n");
   http_client_query("http://localhost:8082/removeip/$shtrecord(key)", "$var(apinfo)");
 }
+```
+
+## API Usage
+
+### Add/Block IP
+
+Add an IP to iptables. iptables or ip6tables will be chosen based on the IP.
+
+* **URL**: `/addip/[ipaddress]` or `/blockip/[ipaddress]`
+* **METHOD**: `GET`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
+#### Add/Block Success Examples
+
+* GET `/addip/1.2.3.4`  
+* RESPONSE `200 OK`
+
+```json
+{"success":"added"}
+```
+
+* GET `/blockip/2001:db8:3333:4444:5555:6666:7777:8888`
+* RESPONSE `200 OK`
+
+```json
+{"success":"added"}
+```
+
+#### Add/Block Error Examples
+
+* GET `/addip/1.2.3`
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"only valid ip addresses supported"}
+```
+
+* GET `/blockip/2001:db8:3333:4444:5555:6666:8888`
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"only valid ip addresses supported"}
+```
+
+### Remove/Unblock IP
+
+Remove an IP from iptables. iptables or ip6tables will be chosen based on the IP.
+
+* **URL**: `/removeip/[ipaddress]` or `/unblockip/[ipaddress]`
+* **METHOD**: `GET`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
+#### Remove/Unblock Success Examples
+
+* GET `/removeip/1.2.3.4`  
+* RESPONSE `200 OK`
+
+```json
+{"success":"removed"}
+```
+
+* GET `/unblockip/2001:db8:3333:4444:5555:6666:7777:8888`
+* RESPONSE `200 OK`
+
+```json
+{"success":"removed"}
+```
+
+#### Remove/Unblock Error Examples
+
+* GET `/removeip/1.2.3`
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"only valid ip addresses supported"}
+```
+
+* GET `/unblockip/2001:db8:3333:4444:5555:6666:8888`
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"only valid ip addresses supported"}
+```
+
+### Flush APIBANLOCAL chain
+
+Flushes the iptables and ip6tables APIBANLOCAL chain.
+
+* **URL**: `/flushchain`
+* **METHOD**: `GET`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
+#### Flush Success Example
+
+* GET `/flushchain`  
+* RESPONSE `200 OK`
+
+```json
+{"success":"flushed"}
+```
+
+#### Flush Error Example
+
+* GET `/flushchain`
+* RESPONSE `500 Internal Server Error`
+
+```json
+{"error":"error initializing iptables"}
 ```
 
 ## License / Warranty
