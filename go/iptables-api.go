@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/gorilla/mux"
+	"github.com/palner/pgrtools/pgparse"
 )
 
 var logFile string
@@ -70,9 +72,11 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/addip/{ipaddress}", addIPAddress).Methods("GET")
 	router.HandleFunc("/blockip/{ipaddress}", addIPAddress).Methods("GET")
+	router.HandleFunc("/flushchain", flushChain).Methods("GET")
 	router.HandleFunc("/removeip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/unblockip/{ipaddress}", removeIPAddress).Methods("GET")
-	router.HandleFunc("/flushchain", flushChain).Methods("GET")
+	router.HandleFunc("/", rAddIPAddress).Methods("POST")
+	router.HandleFunc("/", rRemoveIPAddress).Methods("DELETE")
 	http.ListenAndServe("0.0.0.0:"+APIport, router)
 }
 
@@ -159,6 +163,61 @@ func initializeIPTables(ipt *iptables.IPTables) (string, error) {
 	return "chain created", nil
 }
 
+func iptableHandle(proto string, task string, ipvar string) (string, error) {
+	log.Println("iptableHandle:", proto, task, ipvar)
+
+	var ipProto iptables.Protocol
+	switch proto {
+	case "ipv6":
+		ipProto = iptables.ProtocolIPv6
+	default:
+		ipProto = iptables.ProtocolIPv4
+	}
+
+	// Go connect for IPTABLES
+	ipt, err := iptables.NewWithProtocol(ipProto)
+	if err != nil {
+		log.Println("iptableHandle:", err)
+		return "", err
+	}
+
+	_, err = initializeIPTables(ipt)
+	if err != nil {
+		log.Fatalln("iptableHandler: failed to initialize IPTables:", err)
+		return "", err
+	}
+
+	switch task {
+	case "add":
+		err = ipt.AppendUnique("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		if err != nil {
+			log.Println("iptableHandler: error adding address", err)
+			return "", err
+		} else {
+			return "added", nil
+		}
+	case "delete":
+		err = ipt.DeleteIfExists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		if err != nil {
+			log.Println("iptableHandler: error removing address", err)
+			return "", err
+		} else {
+			return "deleted", nil
+		}
+	case "flush":
+		err = ipt.ClearChain("filter", "APIBANLOCAL")
+		if err != nil {
+			log.Println("iptableHandler:", proto, err)
+			return "", err
+		} else {
+			return "flushed", nil
+		}
+	default:
+		log.Println("iptableHandler: unknown task")
+		return "", errors.New("unknown task")
+	}
+}
+
 func addIPAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
@@ -171,35 +230,12 @@ func addIPAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ipProto iptables.Protocol
-	switch ipType {
-	case "ipv6":
-		ipProto = iptables.ProtocolIPv6
-	default:
-		ipProto = iptables.ProtocolIPv4
-	}
-
-	// Go connect for IPTABLES
-	ipt, err := iptables.NewWithProtocol(ipProto)
+	status, err := iptableHandle(ipType, "add", params["ipaddress"])
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "{\"error\":\"error with iptables\"}", http.StatusInternalServerError)
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+	} else {
+		io.WriteString(w, "{\"success\":\""+status+"\"}\n")
 	}
-
-	_, err = initializeIPTables(ipt)
-	if err != nil {
-		log.Fatalln("failed to initialize IPTables:", err)
-		http.Error(w, "{\"error\":\"error initializing iptables\"}", http.StatusInternalServerError)
-	}
-
-	err = ipt.AppendUnique("filter", "APIBANLOCAL", "-s", params["ipaddress"], "-d", "0/0", "-j", targetChain)
-	if err != nil {
-		log.Println("error adding address", err)
-		http.Error(w, "{\"error\":\"error adding address\"}", http.StatusBadRequest)
-		return
-	}
-
-	io.WriteString(w, "{\"success\":\"added\"}\n")
 }
 
 func removeIPAddress(w http.ResponseWriter, r *http.Request) {
@@ -214,88 +250,114 @@ func removeIPAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ipProto iptables.Protocol
-	switch ipType {
-	case "ipv6":
-		ipProto = iptables.ProtocolIPv6
-	default:
-		ipProto = iptables.ProtocolIPv4
-	}
-
-	// Go connect for IPTABLES
-	ipt, err := iptables.NewWithProtocol(ipProto)
+	status, err := iptableHandle(ipType, "delete", params["ipaddress"])
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "{\"error\":\"error with iptables\"}", http.StatusInternalServerError)
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+	} else {
+		io.WriteString(w, "{\"success\":\""+status+"\"}\n")
 	}
-
-	_, err = initializeIPTables(ipt)
-	if err != nil {
-		log.Fatalln("failed to initialize IPTables:", err)
-		http.Error(w, "{\"error\":\"error initializing iptables\"}", http.StatusInternalServerError)
-	}
-
-	err = ipt.DeleteIfExists("filter", "APIBANLOCAL", "-s", params["ipaddress"], "-d", "0/0", "-j", targetChain)
-	if err != nil {
-		log.Println("error removing address", err)
-		http.Error(w, "{\"error\":\"error removing address\"}", http.StatusBadRequest)
-		return
-	}
-
-	io.WriteString(w, "{\"success\":\"removed\"}\n")
 }
 
 func flushChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	log.Println("processing flushChain")
-	var ipErr string
+	var flushResult string
 
-	// Go connect for IPTABLES
-	ipt, err := iptables.New()
+	_, err := iptableHandle("ipv4", "flush", "")
 	if err != nil {
-		log.Println(err)
-		ipErr = err.Error()
-		http.Error(w, "{\"error\":\"error with iptables\"}", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = initializeIPTables(ipt)
-	if err != nil {
-		log.Fatalln("failed to initialize IPTables:", err)
-		http.Error(w, "{\"error\":\"error initializing iptables\"}", http.StatusInternalServerError)
-		return
-	}
-
-	err = ipt.ClearChain("filter", "APIBANLOCAL")
-	if err != nil {
-		log.Print("Flushing APIBANLOCAL chain failed. ", err.Error())
-		ipErr = err.Error() + " "
+		flushResult = "ipv4" + err.Error() + ". "
 	} else {
-		log.Print("APIBANLOCAL chain flushed.")
+		flushResult = "ipv4 flushed. "
 	}
 
-	// Go connect for IPTABLES
-	ipt, err = iptables.NewWithProtocol(iptables.ProtocolIPv6)
+	_, err = iptableHandle("ipv6", "flush", "")
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "{\"error\":\"error with ip6tables\"}", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = initializeIPTables(ipt)
-	if err != nil {
-		log.Fatalln("failed to initialize IPTables:", err)
-		http.Error(w, "{\"error\":\"error initializing ip6tables\"}", http.StatusInternalServerError)
-		return
-	}
-
-	err = ipt.ClearChain("filter", "APIBANLOCAL")
-	if err != nil {
-		log.Print("Flushing ip6 APIBANLOCAL chain failed. ", err.Error())
-		ipErr = ipErr + err.Error()
-		http.Error(w, "{\"error\":\""+ipErr+"\"}", http.StatusBadRequest)
+		flushResult = flushResult + "ipv6" + err.Error() + ". "
 	} else {
-		log.Print("ip6 APIBANLOCAL chain flushed.")
-		io.WriteString(w, "{\"success\":\"flushed\"}\n")
+		flushResult = flushResult + "ipv6 flushed. "
+	}
+
+	io.WriteString(w, "{\"result\":\""+flushResult+"\"}\n")
+}
+
+func rAddIPAddress(w http.ResponseWriter, r *http.Request) {
+	log.Println("processing rAddIPAddress")
+
+	// parse body
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Println("bodyErr ", err.Error())
+		http.Error(w, "{\"error\":\"unable to read body\"}", http.StatusBadRequest)
+		return
+	}
+
+	log.Println("body received ->", string(body))
+	keyVal := pgparse.ParseBody(body)
+	keyVal = pgparse.LowerKeys(keyVal)
+	log.Println("body (lowercase):", keyVal)
+
+	// check for required fields
+	requiredfields := []string{"ipaddress"}
+	_, err = pgparse.CheckFields(keyVal, requiredfields)
+
+	if err != nil {
+		log.Println("errors occured:", err)
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+		return
+	}
+
+	ipType, err := checkIPAddressv4(keyVal["ipaddress"])
+	if err != nil {
+		log.Println(keyVal["ipaddress"], "is not a valid ip address")
+		http.Error(w, "{\"error\":\"only valid ip addresses supported\"}", http.StatusBadRequest)
+		return
+	}
+
+	status, err := iptableHandle(ipType, "add", keyVal["ipaddress"])
+	if err != nil {
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+	} else {
+		io.WriteString(w, "{\"success\":\""+status+"\"}\n")
+	}
+}
+
+func rRemoveIPAddress(w http.ResponseWriter, r *http.Request) {
+	log.Println("processing rRemoveIPAddress")
+
+	// parse body
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Println("bodyErr ", err.Error())
+		http.Error(w, "{\"error\":\"unable to read body\"}", http.StatusBadRequest)
+		return
+	}
+
+	log.Println("body received ->", string(body))
+	keyVal := pgparse.ParseBody(body)
+	keyVal = pgparse.LowerKeys(keyVal)
+	log.Println("body (lowercase):", keyVal)
+
+	// check for required fields
+	requiredfields := []string{"ipaddress"}
+	_, err = pgparse.CheckFields(keyVal, requiredfields)
+
+	if err != nil {
+		log.Println("errors occured:", err)
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+		return
+	}
+
+	ipType, err := checkIPAddressv4(keyVal["ipaddress"])
+	if err != nil {
+		log.Println(keyVal["ipaddress"], "is not a valid ip address")
+		http.Error(w, "{\"error\":\"only valid ip addresses supported\"}", http.StatusBadRequest)
+		return
+	}
+
+	status, err := iptableHandle(ipType, "delete", keyVal["ipaddress"])
+	if err != nil {
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+	} else {
+		io.WriteString(w, "{\"success\":\""+status+"\"}\n")
 	}
 }

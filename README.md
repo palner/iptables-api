@@ -87,6 +87,13 @@ Add an IP to iptables. iptables or ip6tables will be chosen based on the IP.
 * **Auth**: None
 * **RESPONSE**: 200/4xx/5xx
 
+or
+
+* **URL**: `/`
+* **METHOD**: `POST`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
 #### Add/Block Success Examples
 
 * GET `/addip/1.2.3.4`  
@@ -97,6 +104,13 @@ Add an IP to iptables. iptables or ip6tables will be chosen based on the IP.
 ```
 
 * GET `/blockip/2001:db8:3333:4444:5555:6666:7777:8888`
+* RESPONSE `200 OK`
+
+```json
+{"success":"added"}
+```
+
+* POST `/` with `{"ipaddress":"1.2.3.4"}`  
 * RESPONSE `200 OK`
 
 ```json
@@ -119,6 +133,13 @@ Add an IP to iptables. iptables or ip6tables will be chosen based on the IP.
 {"error":"only valid ip addresses supported"}
 ```
 
+* POST `/` with `{"address":"1.2.3.4"}`  
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"ipaddress is missing. "}
+```
+
 ### Remove/Unblock IP
 
 Remove an IP from iptables. iptables or ip6tables will be chosen based on the IP.
@@ -134,14 +155,21 @@ Remove an IP from iptables. iptables or ip6tables will be chosen based on the IP
 * RESPONSE `200 OK`
 
 ```json
-{"success":"removed"}
+{"success":"deleted"}
 ```
 
 * GET `/unblockip/2001:db8:3333:4444:5555:6666:7777:8888`
 * RESPONSE `200 OK`
 
 ```json
-{"success":"removed"}
+{"success":"deleted"}
+```
+
+* DELETE `/` with `{"ipaddress":"1.2.3.4"}`  
+* RESPONSE `200 OK`
+
+```json
+{"success":"deleted"}
 ```
 
 #### Remove/Unblock Error Examples
@@ -160,6 +188,13 @@ Remove an IP from iptables. iptables or ip6tables will be chosen based on the IP
 {"error":"only valid ip addresses supported"}
 ```
 
+* DELETE `/` with `{"address":"1.2.3.4"}`  
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"ipaddress is missing. "}
+```
+
 ### Flush APIBANLOCAL chain
 
 Flushes the iptables and ip6tables APIBANLOCAL chain.
@@ -175,16 +210,23 @@ Flushes the iptables and ip6tables APIBANLOCAL chain.
 * RESPONSE `200 OK`
 
 ```json
-{"success":"flushed"}
+{"result":"ipv4 flushed. ipv6 flushed. "}
 ```
 
-#### Flush Error Example
+#### Flush Error Examples
 
 * GET `/flushchain`
 * RESPONSE `500 Internal Server Error`
 
 ```json
 {"error":"error initializing iptables"}
+```
+
+* GET `/flushchain`  
+* RESPONSE `200 OK`
+
+```json
+{"result":"ipv4 error. ipv6 flushed. "}
 ```
 
 ## License / Warranty
