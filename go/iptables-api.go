@@ -71,9 +71,9 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/addip/{ipaddress}", addIPAddress).Methods("GET")
-	router.HandleFunc("/puship/{ipaddress}", pushIPAddress).Methods("GET")
 	router.HandleFunc("/blockip/{ipaddress}", addIPAddress).Methods("GET")
 	router.HandleFunc("/flushchain", flushChain).Methods("GET")
+	router.HandleFunc("/puship/{ipaddress}", pushIPAddress).Methods("GET")
 	router.HandleFunc("/removeip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/unblockip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/", rAddIPAddress).Methods("POST")
@@ -197,14 +197,6 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 		} else {
 			return "added", nil
 		}
-	case "push":
-		err = ipt.Insert("filter", "APIBANLOCAL", 1, "-s", ipvar, "-d", "0/0", "-j", targetChain)
-		if err != nil {
-			log.Println("iptableHandler: error pushing address", err)
-			return "", err
-		} else {
-			return "pushed", nil
-		}
 	case "delete":
 		err = ipt.DeleteIfExists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
 		if err != nil {
@@ -220,6 +212,27 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 			return "", err
 		} else {
 			return "flushed", nil
+		}
+	case "push":
+		var exists = false
+		exists, err = ipt.Exists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		if err != nil {
+			log.Println("iptableHandler: error checking if ip already exists", err)
+			return "error checking if ip already exists in the chain", err
+		} else {
+			if exists {
+				err = errors.New("ip already exists")
+				log.Println("iptableHandler: ip already exists", err)
+				return "ip already exists", err
+			} else {
+				err = ipt.Insert("filter", "APIBANLOCAL", 1, "-s", ipvar, "-d", "0/0", "-j", targetChain)
+			}
+		}
+		if err != nil {
+			log.Println("iptableHandler: error pushing address", err)
+			return "", err
+		} else {
+			return "pushed", nil
 		}
 	default:
 		log.Println("iptableHandler: unknown task")
