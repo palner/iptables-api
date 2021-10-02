@@ -76,8 +76,7 @@ func main() {
 	router.HandleFunc("/puship/{ipaddress}", pushIPAddress).Methods("GET")
 	router.HandleFunc("/removeip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/unblockip/{ipaddress}", removeIPAddress).Methods("GET")
-	router.HandleFunc("/", rAddIPAddress).Methods("POST")
-	router.HandleFunc("/", rRemoveIPAddress).Methods("DELETE")
+	router.HandleFunc("/", rHandleIPAddress).Methods("DELETE", "POST", "PUT")
 	http.ListenAndServe("0.0.0.0:"+APIport, router)
 }
 
@@ -322,8 +321,17 @@ func flushChain(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "{\"result\":\""+flushResult+"\"}\n")
 }
 
-func rAddIPAddress(w http.ResponseWriter, r *http.Request) {
-	log.Println("processing rAddIPAddress")
+func rHandleIPAddress(w http.ResponseWriter, r *http.Request) {
+	log.Println("processing rHandleIPAddress", r.Method)
+	var handleType string
+	switch r.Method {
+	case "DELETE":
+		handleType = "delete"
+	case "PUT":
+		handleType = "push"
+	case "POST":
+		handleType = "add"
+	}
 
 	// parse body
 	body, err := ioutil.ReadAll(r.Body)
@@ -355,48 +363,7 @@ func rAddIPAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err := iptableHandle(ipType, "add", keyVal["ipaddress"])
-	if err != nil {
-		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
-	} else {
-		io.WriteString(w, "{\"success\":\""+status+"\"}\n")
-	}
-}
-
-func rRemoveIPAddress(w http.ResponseWriter, r *http.Request) {
-	log.Println("processing rRemoveIPAddress")
-
-	// parse body
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		log.Println("bodyErr ", err.Error())
-		http.Error(w, "{\"error\":\"unable to read body\"}", http.StatusBadRequest)
-		return
-	}
-
-	log.Println("body received ->", string(body))
-	keyVal := pgparse.ParseBody(body)
-	keyVal = pgparse.LowerKeys(keyVal)
-	log.Println("body (lowercase):", keyVal)
-
-	// check for required fields
-	requiredfields := []string{"ipaddress"}
-	_, err = pgparse.CheckFields(keyVal, requiredfields)
-
-	if err != nil {
-		log.Println("errors occured:", err)
-		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
-		return
-	}
-
-	ipType, err := checkIPAddressv4(keyVal["ipaddress"])
-	if err != nil {
-		log.Println(keyVal["ipaddress"], "is not a valid ip address")
-		http.Error(w, "{\"error\":\"only valid ip addresses supported\"}", http.StatusBadRequest)
-		return
-	}
-
-	status, err := iptableHandle(ipType, "delete", keyVal["ipaddress"])
+	status, err := iptableHandle(ipType, handleType, keyVal["ipaddress"])
 	if err != nil {
 		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
 	} else {

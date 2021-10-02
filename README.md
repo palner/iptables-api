@@ -149,6 +149,13 @@ Remove an IP from iptables. iptables or ip6tables will be chosen based on the IP
 * **Auth**: None
 * **RESPONSE**: 200/4xx/5xx
 
+or
+
+* **URL**: `/`
+* **METHOD**: `DELETE`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
 #### Remove/Unblock Success Examples
 
 * GET `/removeip/1.2.3.4`  
@@ -193,6 +200,54 @@ Remove an IP from iptables. iptables or ip6tables will be chosen based on the IP
 
 ```json
 {"error":"ipaddress is missing. "}
+```
+
+### Push IP
+
+Add an IP to the top of iptables. iptables or ip6tables will be chosen based on the IP.
+
+* **URL**: `/puship/[ipaddress]`
+* **METHOD**: `GET`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
+or
+
+* **URL**: `/`
+* **METHOD**: `PUT`
+* **Auth**: None
+* **RESPONSE**: 200/4xx/5xx
+
+#### Push Success Examples
+
+* GET `/puship/1.2.3.4`  
+* RESPONSE `200 OK`
+
+```json
+{"success":"added"}
+```
+
+* PUT `/` with `{"ipaddress":"1.2.3.4"}`  
+* RESPONSE `200 OK`
+
+```json
+{"success":"added"}
+```
+
+#### Push Error Examples
+
+* GET `/puship/1.2.3`
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"ip already exists"}
+```
+
+* GET `/puship/2001:db8:3333:4444:5555:6666:8888`
+* RESPONSE `400 Bad Request`
+
+```json
+{"error":"only valid ip addresses supported"}
 ```
 
 ### Flush APIBANLOCAL chain
