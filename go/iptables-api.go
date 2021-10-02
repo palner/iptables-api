@@ -73,6 +73,7 @@ func main() {
 	router.HandleFunc("/addip/{ipaddress}", addIPAddress).Methods("GET")
 	router.HandleFunc("/blockip/{ipaddress}", addIPAddress).Methods("GET")
 	router.HandleFunc("/flushchain", flushChain).Methods("GET")
+	router.HandleFunc("/puship/{ipaddress}", pushIPAddress).Methods("GET")
 	router.HandleFunc("/removeip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/unblockip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/", rAddIPAddress).Methods("POST")
@@ -212,9 +213,50 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 		} else {
 			return "flushed", nil
 		}
+	case "push":
+		var exists = false
+		exists, err = ipt.Exists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		if err != nil {
+			log.Println("iptableHandler: error checking if ip already exists", err)
+			return "error checking if ip already exists in the chain", err
+		} else {
+			if exists {
+				err = errors.New("ip already exists")
+				log.Println("iptableHandler: ip already exists", err)
+				return "ip already exists", err
+			} else {
+				err = ipt.Insert("filter", "APIBANLOCAL", 1, "-s", ipvar, "-d", "0/0", "-j", targetChain)
+				if err != nil {
+					log.Println("iptableHandler: error pushing address", err)
+					return "", err
+				} else {
+					return "pushed", nil
+				}
+			}
+		}
 	default:
 		log.Println("iptableHandler: unknown task")
 		return "", errors.New("unknown task")
+	}
+}
+
+func pushIPAddress(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	log.Println("processing pushIPAddress", params["ipaddress"])
+
+	ipType, err := checkIPAddressv4(params["ipaddress"])
+	if err != nil {
+		log.Println(params["ipaddress"], "is not a valid ip address")
+		http.Error(w, "{\"error\":\"only valid ip addresses supported\"}", http.StatusBadRequest)
+		return
+	}
+
+	status, err := iptableHandle(ipType, "push", params["ipaddress"])
+	if err != nil {
+		http.Error(w, "{\"error\":\""+err.Error()+"\"}", http.StatusBadRequest)
+	} else {
+		io.WriteString(w, "{\"success\":\""+status+"\"}\n")
 	}
 }
 
