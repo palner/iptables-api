@@ -226,13 +226,13 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 				return "ip already exists", err
 			} else {
 				err = ipt.Insert("filter", "APIBANLOCAL", 1, "-s", ipvar, "-d", "0/0", "-j", targetChain)
+				if err != nil {
+					log.Println("iptableHandler: error pushing address", err)
+					return "", err
+				} else {
+					return "pushed", nil
+				}
 			}
-		}
-		if err != nil {
-			log.Println("iptableHandler: error pushing address", err)
-			return "", err
-		} else {
-			return "pushed", nil
 		}
 	default:
 		log.Println("iptableHandler: unknown task")
