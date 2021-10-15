@@ -4,7 +4,24 @@ Very simple API for managing local iptables chain: `APIBANLOCAL`
 
 Simple `GET` actions of add, remove, and flush (see [API usage](#API-usage) for more).
 
+## Contents
+
+* [Super Lazy Install](#super-lazy-install)
+* [Usage](#usage)
+  * [Default Settings](#default-settings)
+  * [Example with flags](#example-with-flags)
+* [Running as a Service (example)](#running-as-a-service-example)
+* [Kamailio Example](#kamailio-example)
+* **[API Usage](#api-usage)**
+  * [Add/Block IP](#addblock-ip)
+  * [Remove/Unblock IP](#removeunblock-ip)
+  * [Push IP](#push-ip)
+  * [Flush APIBANLOCAL chain](#flush-apibanlocal-chain)
+* [License / Warranty](#license--warranty)
+
 ## Super Lazy Install
+
+Please at least look at the script before blindly running it on your system.
 
 `curl -sSL https://raw.githubusercontent.com/palner/iptables-api/main/install_iptables-api.sh | bash`
 
@@ -13,6 +30,10 @@ Simple `GET` actions of add, remove, and flush (see [API usage](#API-usage) for 
 `curl -sSL https://raw.githubusercontent.com/palner/iptables-api/main/install_iptables-api-pi.sh | bash`
 
 ## Usage
+
+It is recommended that you run iptables-api [as a service](#running-as-a-service-example), however you can run it however you like.
+
+To run, simply set exe permissions (such as `chmod 755 iptables-api`) and run:
 
 `./iptables-api`
 
