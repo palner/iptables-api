@@ -4,11 +4,19 @@ Very simple API for managing local iptables chain: `APIBANLOCAL`
 
 Simple `GET` actions of add, remove, and flush (see [API usage](#API-usage) for more).
 
+## Super Lazy Install
+
+`curl -sSL https://raw.githubusercontent.com/palner/iptables-api/main/install_iptables-api.sh | bash`
+
+(or for a Pi)
+
+`curl -sSL https://raw.githubusercontent.com/palner/iptables-api/main/install_iptables-api-pi.sh | bash`
+
 ## Usage
 
 `./iptables-api`
 
-Defaults:
+### Default Settings
 
 * port: `8082`
 * log: `/var/log/iptables-api.log`
