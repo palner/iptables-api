@@ -76,7 +76,7 @@ func main() {
 	router.HandleFunc("/puship/{ipaddress}", pushIPAddress).Methods("GET")
 	router.HandleFunc("/removeip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/unblockip/{ipaddress}", removeIPAddress).Methods("GET")
-	router.HandleFunc("/", rHandleIPAddress).Methods("DELETE", "POST", "PUT")
+	router.HandleFunc("/", rHandleIPAddress).Methods("DELETE", "POST", "PUT", "PATCH")
 	http.ListenAndServe("0.0.0.0:"+APIport, router)
 }
 
@@ -212,6 +212,14 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 		} else {
 			return "flushed", nil
 		}
+	case "match":
+		err = ipt.AppendUnique("filter", "APIBANLOCAL", "-m", "string", "--algo", "bm", "--string", ipvar, "-j", targetChain)
+		if err != nil {
+			log.Println("iptableHandler: error adding address", err)
+			return "", err
+		} else {
+			return "added", nil
+		}
 	case "push":
 		var exists = false
 		exists, err = ipt.Exists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
@@ -331,6 +339,8 @@ func rHandleIPAddress(w http.ResponseWriter, r *http.Request) {
 		handleType = "push"
 	case "POST":
 		handleType = "add"
+	case "PATCH":
+		handleType = "match"
 	}
 
 	// parse body
