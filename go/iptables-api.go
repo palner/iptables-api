@@ -37,12 +37,14 @@ import (
 	"github.com/palner/pgrtools/pgparse"
 )
 
-var logFile string
-var targetChain string
 var APIport string
+var logFile string
+var chainName string
+var targetChain string
 
 func init() {
 	flag.StringVar(&targetChain, "target", "REJECT", "target chain for matching entries")
+	flag.StringVar(&chainName, "chain", "APIBANLOCAL", "chain name for entries")
 	flag.StringVar(&logFile, "log", "/var/log/iptables-api.log", "location of log file or - for stdout")
 	flag.StringVar(&APIport, "port", "8082", "port to listen on")
 }
@@ -133,34 +135,33 @@ func initializeIPTables(ipt *iptables.IPTables) (string, error) {
 		return "error", errors.New("iptables does not contain expected FORWARD chain")
 	}
 
-	// Search for APIBAN in IPTABLES
-	chain = "APIBANLOCAL"
-	if contains(originaListChain, chain) {
-		// APIBAN chain already exists
+	// Search for chainName in IPTABLES
+	if contains(originaListChain, chainName) {
+		// chainName already exists
 		return "chain exists", nil
 	}
 
-	log.Print("IPTABLES doesn't contain APIBANLOCAL. Creating now...")
+	log.Print("IPTABLES doesn't contain " + chainName + ". Creating now...")
 
-	// Add APIBAN chain
-	err = ipt.ClearChain("filter", chain)
+	// Add chain
+	err = ipt.ClearChain("filter", chainName)
 	if err != nil {
-		return "error", fmt.Errorf("failed to clear APIBANLOCAL chain: %w", err)
+		return "error", fmt.Errorf("failed to clear chain: %w", err)
 	}
 
-	// Add APIBAN chain to INPUT
-	err = ipt.Insert("filter", "INPUT", 1, "-j", chain)
+	// Add chainName to INPUT
+	err = ipt.Insert("filter", "INPUT", 1, "-j", chainName)
 	if err != nil {
-		return "error", fmt.Errorf("failed to add APIBANLOCAL chain to INPUT chain: %w", err)
+		return "error", fmt.Errorf("failed to add chain to INPUT chain: %w", err)
 	}
 
-	// Add APIBAN chain to FORWARD
-	err = ipt.Insert("filter", "FORWARD", 1, "-j", chain)
+	// Add chain to FORWARD
+	err = ipt.Insert("filter", "FORWARD", 1, "-j", chainName)
 	if err != nil {
-		return "error", fmt.Errorf("failed to add APIBANLOCAL chain to FORWARD chain: %w", err)
+		return "error", fmt.Errorf("failed to add chain to FORWARD chain: %w", err)
 	}
 
-	return "chain created", nil
+	return chainName + " created", nil
 }
 
 func iptableHandle(proto string, task string, ipvar string) (string, error) {
@@ -189,7 +190,7 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 
 	switch task {
 	case "add":
-		err = ipt.AppendUnique("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		err = ipt.AppendUnique("filter", chainName, "-s", ipvar, "-d", "0/0", "-j", targetChain)
 		if err != nil {
 			log.Println("iptableHandler: error adding address", err)
 			return "", err
@@ -197,7 +198,7 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 			return "added", nil
 		}
 	case "delete":
-		err = ipt.DeleteIfExists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		err = ipt.DeleteIfExists("filter", chainName, "-s", ipvar, "-d", "0/0", "-j", targetChain)
 		if err != nil {
 			log.Println("iptableHandler: error removing address", err)
 			return "", err
@@ -205,7 +206,7 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 			return "deleted", nil
 		}
 	case "flush":
-		err = ipt.ClearChain("filter", "APIBANLOCAL")
+		err = ipt.ClearChain("filter", chainName)
 		if err != nil {
 			log.Println("iptableHandler:", proto, err)
 			return "", err
@@ -214,7 +215,7 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 		}
 	case "push":
 		var exists = false
-		exists, err = ipt.Exists("filter", "APIBANLOCAL", "-s", ipvar, "-d", "0/0", "-j", targetChain)
+		exists, err = ipt.Exists("filter", chainName, "-s", ipvar, "-d", "0/0", "-j", targetChain)
 		if err != nil {
 			log.Println("iptableHandler: error checking if ip already exists", err)
 			return "error checking if ip already exists in the chain", err
@@ -224,7 +225,7 @@ func iptableHandle(proto string, task string, ipvar string) (string, error) {
 				log.Println("iptableHandler: ip already exists", err)
 				return "ip already exists", err
 			} else {
-				err = ipt.Insert("filter", "APIBANLOCAL", 1, "-s", ipvar, "-d", "0/0", "-j", targetChain)
+				err = ipt.Insert("filter", chainName, 1, "-s", ipvar, "-d", "0/0", "-j", targetChain)
 				if err != nil {
 					log.Println("iptableHandler: error pushing address", err)
 					return "", err
