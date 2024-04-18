@@ -25,7 +25,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -41,12 +40,15 @@ var APIport string
 var logFile string
 var chainName string
 var targetChain string
+var ListenIP string
 
 func init() {
 	flag.StringVar(&targetChain, "target", "REJECT", "target chain for matching entries")
 	flag.StringVar(&chainName, "chain", "APIBANLOCAL", "chain name for entries")
 	flag.StringVar(&logFile, "log", "/var/log/iptables-api.log", "location of log file or - for stdout")
 	flag.StringVar(&APIport, "port", "8082", "port to listen on")
+	flag.StringVar(&ListenIP, "ip", "127.0.0.1", "ip address to listen on")
+
 }
 
 func main() {
@@ -69,7 +71,7 @@ func main() {
 	log.Print("** Starting iptables-API")
 	log.Print("** Choose to be optimistic, it feels better.")
 	log.Print("** Licensed under GPLv2. See LICENSE for details.")
-	log.Print("** API will listen on port ", APIport)
+	log.Print("** API will listen on ", ListenIP, ":", APIport)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/addip/{ipaddress}", addIPAddress).Methods("GET")
@@ -79,7 +81,7 @@ func main() {
 	router.HandleFunc("/removeip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/unblockip/{ipaddress}", removeIPAddress).Methods("GET")
 	router.HandleFunc("/", rHandleIPAddress).Methods("DELETE", "POST", "PUT")
-	http.ListenAndServe("0.0.0.0:"+APIport, router)
+	http.ListenAndServe(ListenIP+":"+APIport, router)
 }
 
 // Function to see if string within string
@@ -92,17 +94,17 @@ func contains(list []string, value string) bool {
 	return false
 }
 
-func checkIPAddress(ip string) bool {
-	if net.ParseIP(ip) == nil {
-		return false
-	} else {
-		return true
-	}
-}
+//func checkIPAddress(ip string) bool {
+//	if net.ParseIP(ip) == nil {
+//		return false
+//	} else {
+//		return true
+//	}
+//}
 
 func checkIPAddressv4(ip string) (string, error) {
 	if net.ParseIP(ip) == nil {
-		return "", errors.New("Not an IP address")
+		return "", errors.New("not an ip address")
 	}
 	for i := 0; i < len(ip); i++ {
 		switch ip[i] {
@@ -335,7 +337,7 @@ func rHandleIPAddress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// parse body
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println("bodyErr ", err.Error())
 		http.Error(w, "{\"error\":\"unable to read body\"}", http.StatusBadRequest)
