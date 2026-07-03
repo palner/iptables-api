@@ -42,6 +42,7 @@ To run, simply set exe permissions (such as `chmod 755 iptables-api`) and run:
 * port: `8082`
 * log: `/var/log/iptables-api.log`
 * target: `REJECT`
+* ip: `127.0.0.1`
 
 Compiled `iptables-api` will work for most linux distributions and `iptables-api-arm` will work for most Raspberry Pi distributions.
 
@@ -49,7 +50,7 @@ You can also compile the program using `go build iptables-api.go`.
 
 ### Example with flags
 
-`./iptables-api -log=stdout -port=8008 -target=DROP`
+`./iptables-api -log=stdout -port=8008 -target=DROP -ip=0.0.0.0`
 
 ## Running as a Service (example)
 
